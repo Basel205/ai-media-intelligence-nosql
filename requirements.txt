@@ -1,0 +1,8 @@
+pymongo
+opencv-python
+numpy
+pillow
+tqdm
+torch
+torchvision
+transformers

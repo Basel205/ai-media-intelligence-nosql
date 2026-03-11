@@ -1,0 +1,29 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+.env/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dataset (do not upload images)
+data/raw_media/
+data/processed/
+
+# VSCode
+.vscode/
+
+# Python build files
+build/
+dist/
+*.egg-info/
+
+# datasets
+data/
+intel_dataset/
+*.zip
+
