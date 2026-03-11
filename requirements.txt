@@ -1,8 +1,8 @@
-pymongo
-opencv-python
-numpy
-pillow
-tqdm
-torch
-torchvision
-transformers
+pymongo==4.6.1
+torch>=2.0.0
+transformers>=4.35.0
+Pillow>=10.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+tqdm>=4.65.0
+flask>=3.0.0

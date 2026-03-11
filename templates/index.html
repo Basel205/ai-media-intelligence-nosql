@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Media Intelligence — Semantic Search</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1a1d27;
+      --card:     #21253a;
+      --border:   #2e3350;
+      --accent:   #6366f1;
+      --accent2:  #10b981;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --danger:   #f43f5e;
+      --radius:   10px;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: .02em; }
+    header h1 span { color: var(--accent); }
+    .stats-bar { display: flex; gap: 1.5rem; font-size: .8rem; color: var(--muted); }
+    .stats-bar b { color: var(--text); }
+
+    /* ── Main layout ── */
+    main { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+    /* ── Search box ── */
+    .search-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .search-row { display: flex; gap: .75rem; margin-bottom: 1rem; }
+    #query-input {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      padding: .75rem 1rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    #query-input:focus { border-color: var(--accent); }
+    .btn {
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-size: .9rem;
+      font-weight: 600;
+      padding: .75rem 1.5rem;
+      transition: opacity .15s;
+      white-space: nowrap;
+    }
+    .btn:hover { opacity: .85; }
+    .btn.secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+    .btn.green { background: var(--accent2); }
+
+    /* Method toggle */
+    .controls { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+    .toggle-group { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .toggle-btn {
+      background: var(--card);
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: .85rem;
+      padding: .5rem 1rem;
+      transition: all .15s;
+    }
+    .toggle-btn.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+    /* Filters */
+    .filters { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: .75rem; }
+    .filter-item { display: flex; flex-direction: column; gap: .2rem; font-size: .78rem; color: var(--muted); }
+    .filter-item input[type=range] { accent-color: var(--accent); width: 130px; }
+    .filter-item .val { color: var(--text); font-weight: 600; }
+
+    /* ── Tabs ── */
+    .tab-bar { display: flex; gap: .5rem; margin-bottom: 1rem; }
+    .tab {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: .85rem;
+      padding: .5rem 1.1rem;
+      transition: all .15s;
+    }
+    .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+    /* ── Results panel ── */
+    #results-panel, #compare-panel, #eval-panel { display: none; }
+    #results-panel.visible, #compare-panel.visible, #eval-panel.visible { display: block; }
+
+    .results-header {
+      color: var(--muted);
+      font-size: .85rem;
+      margin-bottom: 1rem;
+    }
+    .results-header b { color: var(--text); }
+
+    /* Image grid */
+    .image-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    .image-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: transform .15s, border-color .15s;
+      cursor: pointer;
+    }
+    .image-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+    .image-card img {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      display: block;
+    }
+    .image-card .card-body { padding: .6rem .75rem; }
+    .image-card .fname { font-size: .78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score-row { display: flex; justify-content: space-between; align-items: center; margin-top: .3rem; }
+    .score-badge {
+      font-size: .75rem;
+      font-weight: 700;
+      border-radius: 5px;
+      padding: .15rem .5rem;
+    }
+    .score-badge.css      { background: rgba(99,102,241,.2); color: #a5b4fc; }
+    .score-badge.baseline { background: rgba(100,116,139,.15); color: var(--muted); }
+    .rank { font-size: .72rem; color: var(--muted); }
+
+    /* ── Compare panel ── */
+    .compare-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .col-header { font-size: .85rem; font-weight: 700; margin-bottom: .75rem; padding: .4rem .75rem; border-radius: 6px; }
+    .col-header.baseline-col { background: rgba(100,116,139,.15); color: var(--muted); }
+    .col-header.css-col      { background: rgba(99,102,241,.15);  color: #a5b4fc; }
+    .compare-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .75rem; }
+
+    /* ── Evaluation panel ── */
+    #eval-table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+    th, td { border: 1px solid var(--border); padding: .55rem .9rem; text-align: left; }
+    th { background: var(--card); color: var(--muted); font-weight: 600; }
+    tr:nth-child(even) { background: rgba(255,255,255,.02); }
+    .delta-pos { color: var(--accent2); font-weight: 700; }
+    .delta-neg { color: var(--danger); }
+    .avg-row td { background: var(--surface); font-weight: 700; border-top: 2px solid var(--border); }
+
+    /* ── Loading ── */
+    .spinner {
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      width: 36px; height: 36px;
+      animation: spin .7s linear infinite;
+      margin: 3rem auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Empty state ── */
+    .empty { text-align: center; color: var(--muted); padding: 4rem 1rem; font-size: .95rem; }
+
+    /* ── Modal ── */
+    #modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.8);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #modal-overlay.open { display: flex; }
+    #modal-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      max-width: 700px; width: 90%;
+      padding: 1.5rem;
+    }
+    #modal-img { width: 100%; border-radius: 8px; margin-bottom: 1rem; }
+    #modal-meta { font-size: .82rem; color: var(--muted); line-height: 1.8; }
+    #modal-meta b { color: var(--text); }
+    #modal-close { float: right; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.3rem; }
+
+    @media (max-width: 700px) {
+      .compare-columns { grid-template-columns: 1fr; }
+      header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🔍 Media <span>Intelligence</span></h1>
+  <div class="stats-bar" id="stats-bar">Loading stats...</div>
+</header>
+
+<main>
+
+  <!-- Search Section -->
+  <div class="search-section">
+    <div class="search-row">
+      <input id="query-input" type="text" placeholder='Search images... e.g. "sea waves", "mountain forest"' />
+      <button class="btn" onclick="doSearch()">Search</button>
+      <button class="btn secondary" onclick="doCompare()">Compare</button>
+    </div>
+
+    <div class="controls">
+      <div>
+        <div style="font-size:.78rem;color:var(--muted);margin-bottom:.35rem;">Search Method</div>
+        <div class="toggle-group">
+          <button class="toggle-btn active" id="btn-css"      onclick="setMethod('css')">CSS (Novel)</button>
+          <button class="toggle-btn"        id="btn-baseline" onclick="setMethod('baseline')">Baseline Cosine</button>
+        </div>
+      </div>
+
+      <div id="filter-section" class="filters">
+        <div class="filter-item">
+          <span>Min Sharpness <span class="val" id="blur-val">OFF</span></span>
+          <input type="range" id="min-blur" min="0" max="500" value="0" step="10"
+                 oninput="document.getElementById('blur-val').textContent = this.value > 0 ? this.value : 'OFF'" />
+        </div>
+        <div class="filter-item">
+          <span>Min Brightness <span class="val" id="bright-val">OFF</span></span>
+          <input type="range" id="min-brightness" min="0" max="0.8" value="0" step="0.05"
+                 oninput="document.getElementById('bright-val').textContent = this.value > 0 ? this.value : 'OFF'" />
+        </div>
+        <div class="filter-item">
+          <span>Results</span>
+          <select id="top-k" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:.3rem .6rem;font-size:.85rem;">
+            <option value="6">6</option>
+            <option value="12" selected>12</option>
+            <option value="24">24</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab active" id="tab-results"  onclick="switchTab('results')">Results</button>
+    <button class="tab"        id="tab-compare"  onclick="switchTab('compare')">Baseline vs CSS</button>
+    <button class="tab"        id="tab-eval"     onclick="switchTab('eval')">Evaluation</button>
+  </div>
+
+  <!-- Results panel -->
+  <div id="results-panel" class="visible">
+    <div class="empty">Enter a search query above to find images.</div>
+  </div>
+
+  <!-- Compare panel -->
+  <div id="compare-panel">
+    <div class="empty">Press <b>Compare</b> to see Baseline vs CSS side by side.</div>
+  </div>
+
+  <!-- Evaluation panel -->
+  <div id="eval-panel">
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:1rem;">
+      Runs Precision@5 and Precision@10 for 6 standard queries.
+      Uses Intel dataset folder labels as ground truth. Takes ~30 seconds.
+    </p>
+    <button class="btn green" onclick="runEval()">Run Evaluation</button>
+    <div id="eval-content" style="margin-top:1.5rem;"></div>
+  </div>
+
+</main>
+
+<!-- Image Modal -->
+<div id="modal-overlay" onclick="closeModal()">
+  <div id="modal-box" onclick="event.stopPropagation()">
+    <button id="modal-close" onclick="closeModal()">✕</button>
+    <img id="modal-img" src="" alt="" />
+    <div id="modal-meta"></div>
+  </div>
+</div>
+
+<script>
+  let currentMethod = 'css';
+  let lastQuery = '';
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  window.onload = () => {
+    loadStats();
+    document.getElementById('query-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doSearch();
+    });
+  };
+
+  async function loadStats() {
+    const r = await fetch('/api/stats').then(r => r.json()).catch(() => null);
+    if (!r) return;
+    document.getElementById('stats-bar').innerHTML =
+      `Total images: <b>${r.total}</b> &nbsp;|&nbsp; Embedded: <b>${r.embedded}</b>`;
+  }
+
+  // ── Method toggle ─────────────────────────────────────────────────────────
+  function setMethod(m) {
+    currentMethod = m;
+    document.getElementById('btn-css').classList.toggle('active', m === 'css');
+    document.getElementById('btn-baseline').classList.toggle('active', m === 'baseline');
+    document.getElementById('filter-section').style.opacity = m === 'css' ? '1' : '0.4';
+  }
+
+  // ── Tab switching ─────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    ['results','compare','eval'].forEach(t => {
+      document.getElementById(`${t}-panel`).classList.toggle('visible', t === tab);
+      document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+    });
+  }
+
+  // ── Search ────────────────────────────────────────────────────────────────
+  async function doSearch() {
+    const q = document.getElementById('query-input').value.trim();
+    if (!q) return;
+    lastQuery = q;
+
+    const topK = document.getElementById('top-k').value;
+    const minBlur = document.getElementById('min-blur').value;
+    const minBright = document.getElementById('min-brightness').value;
+
+    let url = `/api/search?q=${encodeURIComponent(q)}&method=${currentMethod}&top_k=${topK}`;
+    if (currentMethod === 'css' && minBlur > 0)    url += `&min_blur=${minBlur}`;
+    if (currentMethod === 'css' && minBright > 0)  url += `&min_brightness=${minBright}`;
+
+    const panel = document.getElementById('results-panel');
+    panel.innerHTML = '<div class="spinner"></div>';
+    switchTab('results');
+
+    const data = await fetch(url).then(r => r.json()).catch(() => null);
+    if (!data || data.error) {
+      panel.innerHTML = `<div class="empty">${data?.error || 'Search failed.'}</div>`;
+      return;
+    }
+
+    const isCss = data.method === 'css';
+    const label = isCss ? 'CSS Score' : 'Cosine Sim';
+
+    panel.innerHTML = `
+      <div class="results-header">
+        <b>${data.results.length}</b> results for <b>"${q}"</b>
+        &nbsp;·&nbsp; Method: <b>${isCss ? 'Composite Semantic Similarity (CSS)' : 'Baseline Cosine'}</b>
+      </div>
+      <div class="image-grid">
+        ${data.results.map((r, i) => imageCard(r, i+1, isCss ? 'css' : 'baseline', label)).join('')}
+      </div>`;
+  }
+
+  // ── Compare ───────────────────────────────────────────────────────────────
+  async function doCompare() {
+    const q = document.getElementById('query-input').value.trim();
+    if (!q) { alert('Enter a query first.'); return; }
+
+    const topK = 6;
+    const panel = document.getElementById('compare-panel');
+    panel.innerHTML = '<div class="spinner"></div>';
+    switchTab('compare');
+
+    const data = await fetch(`/api/compare?q=${encodeURIComponent(q)}&top_k=${topK}`)
+      .then(r => r.json()).catch(() => null);
+
+    if (!data) { panel.innerHTML = '<div class="empty">Compare failed.</div>'; return; }
+
+    panel.innerHTML = `
+      <div class="results-header" style="margin-bottom:1rem;">
+        Comparing <b>"${q}"</b> — top ${topK} results per method
+      </div>
+      <div class="compare-columns">
+        <div>
+          <div class="col-header baseline-col">⬛ Baseline — Pure Cosine Similarity</div>
+          <div class="compare-grid">
+            ${data.baseline.map((r,i) => imageCard(r, i+1, 'baseline', 'Cosine')).join('')}
+          </div>
+        </div>
+        <div>
+          <div class="col-header css-col">🟣 CSS — Composite Semantic Similarity</div>
+          <div class="compare-grid">
+            ${data.css.map((r,i) => imageCard(r, i+1, 'css', 'CSS')).join('')}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ── Evaluation ────────────────────────────────────────────────────────────
+  async function runEval() {
+    const el = document.getElementById('eval-content');
+    el.innerHTML = '<div class="spinner"></div><p style="text-align:center;color:var(--muted);margin-top:.5rem;font-size:.85rem;">Running evaluation (~30s)...</p>';
+
+    const data = await fetch('/api/evaluate').then(r => r.json()).catch(() => null);
+    if (!data) { el.innerHTML = '<div class="empty">Evaluation failed.</div>'; return; }
+
+    // Build table
+    const rows = data.records;
+    const queries = [...new Set(rows.map(r => r.query))];
+    const ks = [...new Set(rows.map(r => r.k))].sort((a,b)=>a-b);
+
+    let html = '<div id="eval-table-wrap"><table><thead><tr>'
+      + '<th>Query</th><th>Label</th>'
+      + ks.flatMap(k => [`<th>P@${k} Base</th>`, `<th>P@${k} CSS</th>`, `<th>Δ@${k}</th>`]).join('')
+      + '</tr></thead><tbody>';
+
+    for (const q of queries) {
+      const qrows = rows.filter(r => r.query === q);
+      html += `<tr><td>${q}</td><td>${qrows[0].label}</td>`;
+      for (const k of ks) {
+        const r = qrows.find(r => r.k === k);
+        const cls = r.delta >= 0 ? 'delta-pos' : 'delta-neg';
+        const ds  = r.delta >= 0 ? `+${r.delta.toFixed(3)}` : r.delta.toFixed(3);
+        html += `<td>${r.baseline.toFixed(3)}</td><td>${r.css.toFixed(3)}</td><td class="${cls}">${ds}</td>`;
+      }
+      html += '</tr>';
+    }
+
+    // Averages row
+    html += '<tr class="avg-row"><td>AVERAGE</td><td>—</td>';
+    for (const k of ks) {
+      const sub = rows.filter(r => r.k === k);
+      const avgB = sub.reduce((s,r)=>s+r.baseline,0)/sub.length;
+      const avgC = sub.reduce((s,r)=>s+r.css,0)/sub.length;
+      const avgD = avgC - avgB;
+      const cls  = avgD >= 0 ? 'delta-pos' : 'delta-neg';
+      const ds   = avgD >= 0 ? `+${avgD.toFixed(3)}` : avgD.toFixed(3);
+      html += `<td>${avgB.toFixed(3)}</td><td>${avgC.toFixed(3)}</td><td class="${cls}">${ds}</td>`;
+    }
+    html += '</tr></tbody></table></div>';
+
+    el.innerHTML = html;
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function imageCard(r, rank, method, label) {
+    const score = method === 'css' ? r.css_score : r.cosine_similarity;
+    const imgUrl = `/image?path=${encodeURIComponent(r.file_path)}`;
+    const dataAttr = encodeURIComponent(JSON.stringify(r));
+    return `
+      <div class="image-card" onclick="openModal('${dataAttr}')">
+        <img src="${imgUrl}" alt="${r.file_name}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22150%22><rect fill=%22%2321253a%22 width=%22200%22 height=%22150%22/><text x=%2250%%22 y=%2250%%22 fill=%22%2364748b%22 text-anchor=%22middle%22 dy=%22.3em%22>No Image</text></svg>'" />
+        <div class="card-body">
+          <div class="fname">${r.file_name}</div>
+          <div class="score-row">
+            <span class="score-badge ${method}">${label}: ${score.toFixed(3)}</span>
+            <span class="rank">#${rank}</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function openModal(dataAttr) {
+    const r = JSON.parse(decodeURIComponent(dataAttr));
+    document.getElementById('modal-img').src = `/image?path=${encodeURIComponent(r.file_path)}`;
+    const m = r.metadata || {};
+    document.getElementById('modal-meta').innerHTML = `
+      <b>File:</b> ${r.file_name}<br>
+      <b>CSS Score:</b> ${r.css_score ?? '—'} &nbsp; <b>Cosine:</b> ${r.cosine_similarity ?? '—'}<br>
+      <b>Resolution:</b> ${m.width ?? '?'} × ${m.height ?? '?'}<br>
+      <b>Blur Score:</b> ${m.blur_score?.toFixed(1) ?? '?'} &nbsp; <b>Brightness:</b> ${m.brightness?.toFixed(3) ?? '?'}<br>
+      <b>Method:</b> ${r.method ?? '—'}`;
+    document.getElementById('modal-overlay').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+</script>
+
+<!-- Evaluation API route (added inline to avoid extra file) -->
+<script>
+  // Evaluation endpoint called from the page
+  // The actual /api/evaluate route needs to be added to app.py
+</script>
+
+</body>
+</html>

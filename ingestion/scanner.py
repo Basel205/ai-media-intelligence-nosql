@@ -1,32 +1,24 @@
 import os
 import uuid
+from utils.file_utils import get_all_image_paths
 
 
-SUPPORTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
-
-
-def scan_media_folder(folder_path):
+def scan_media_folder(folder_path: str) -> list[dict]:
     """
-    Scan folder and return image file records.
+    Recursively scan a folder and return a list of file descriptor dicts.
+    Each dict contains file_id, file_path, and file_name.
     """
+    if not os.path.exists(folder_path):
+        raise FileNotFoundError(f"Media folder not found: {folder_path}")
 
-    media_files = []
+    paths = get_all_image_paths(folder_path)
 
-    for root, _, files in os.walk(folder_path):
-        for file in files:
+    files = []
+    for path in paths:
+        files.append({
+            "file_id":   str(uuid.uuid4()),
+            "file_path": os.path.abspath(path),
+            "file_name": os.path.basename(path)
+        })
 
-            ext = os.path.splitext(file)[1].lower()
-
-            if ext in SUPPORTED_EXTENSIONS:
-
-                file_path = os.path.join(root, file)
-
-                record = {
-                    "file_id": str(uuid.uuid4()),
-                    "file_path": file_path,
-                    "file_name": file
-                }
-
-                media_files.append(record)
-
-    return media_files
+    return files

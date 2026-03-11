@@ -2,45 +2,38 @@ import cv2
 import numpy as np
 
 
-def compute_blur_score(image):
+def compute_blur_score(image) -> float:
     """
-    Blur detection using Laplacian variance.
+    Sharpness detection using Laplacian variance.
+    Higher value = sharper image.
     """
-
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    score = cv2.Laplacian(gray, cv2.CV_64F).var()
-
-    return float(score)
+    return float(cv2.Laplacian(gray, cv2.CV_64F).var())
 
 
-def compute_brightness(image):
+def compute_brightness(image) -> float:
     """
-    Compute average brightness.
+    Mean brightness from HSV value channel, normalised to [0, 1].
     """
-
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    brightness = np.mean(hsv[:, :, 2])
-
-    return float(brightness / 255)
+    return float(np.mean(hsv[:, :, 2]) / 255.0)
 
 
-def extract_metadata(image_path):
+def extract_metadata(image_path: str) -> dict | None:
     """
-    Extract metadata from an image.
+    Extract visual metadata from an image file.
+    Returns None if the image cannot be read.
     """
-
     image = cv2.imread(image_path)
-
     if image is None:
         return None
 
     height, width = image.shape[:2]
 
-    metadata = {
-        "width": width,
-        "height": height,
+    return {
+        "width":      width,
+        "height":     height,
         "brightness": compute_brightness(image),
-        "blur_score": compute_blur_score(image)
+        "blur_score": compute_blur_score(image),
+        "aspect_ratio": round(width / height, 3)
     }
-
-    return metadata
