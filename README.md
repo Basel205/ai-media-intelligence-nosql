@@ -1,327 +1,442 @@
 # AI-Powered Media Intelligence System
 
-> A local, privacy-first semantic image search engine that understands your photos — not just their filenames.
+> A local, privacy-first media intelligence system for semantic image search, quality-aware ranking, and face clustering, built on MongoDB.
 
 ---
 
-## What Is This?
+## What This Project Does
 
-You have thousands of photos scattered across your laptop. Their filenames are `IMG_2847.jpg`, `screenshot_final(2).png`, `photo_20231104_183422.jpg`. Searching for "beach sunset" or "birthday party" is impossible — there are no tags, no labels, no metadata that means anything.
+This project indexes images from your local machine, understands their visual content using AI, stores rich metadata in MongoDB, and lets you search the collection in natural language.
 
-This system fixes that. It reads every image on your machine, uses an AI model to understand what's actually *in* each photo, and lets you search your entire photo library using plain English — exactly like Google Photos, but running 100% locally. Your images never leave your machine.
+It now supports two major intelligence layers:
 
-```
-You type:  "mountain with snow"
-System returns: the 20 most visually relevant photos from anywhere on your laptop
-```
+- Semantic image understanding with CLIP embeddings
+- Person discovery with face detection, face embeddings, clustering, and manual person labeling
 
-No cloud. No API keys. No privacy trade-offs.
+Everything runs locally:
 
----
-
-## Key Features
-
-- **Natural language search** — search by meaning, not filename
-- **System tray integration** — runs silently in the background, always ready
-- **Automatic indexing** — new images added anywhere in your watched folders get indexed automatically
-- **GPU-accelerated** — uses your NVIDIA GPU for fast embedding generation
-- **Dual search interface** — desktop app window (native) + web dashboard (browser)
-- **CSS novelty algorithm** — custom re-ranking that factors in image quality alongside semantic similarity
-- **Hybrid MongoDB queries** — combine semantic vector search with structured metadata filters
-- **Duplicate detection** — finds near-identical images using embedding similarity
-- **Quality-aware results** — blurry and dark images are ranked lower automatically
+- Images remain on disk
+- MongoDB stores paths, metadata, embeddings, and face sub-documents
+- No cloud image upload is required
 
 ---
 
-## How It Works
+## Core Features
 
-### The Core Idea — CLIP Embeddings
-
-This system uses **CLIP** (Contrastive Language-Image Pretraining), an AI model trained by OpenAI on 400 million image-text pairs. CLIP's key property: it maps both images and text into the same 512-dimensional vector space.
-
-This means:
-- A photo of a forest → `[0.02, -0.14, 0.33, ...]` (512 numbers)
-- The text "forest trees" → `[0.01, -0.12, 0.31, ...]` (512 numbers)
-- These two vectors are **close to each other** in the vector space
-
-Finding similar images becomes a mathematical problem: find all image vectors closest to your query vector. This is cosine similarity search.
-
-### The Full Pipeline
-
-```
-Your photos (stay on disk — never copied or moved)
-        │
-        ▼
-Scanner finds all .jpg/.png/.webp files across watched folders
-        │
-        ▼
-Metadata extracted per image:
-  - Resolution (width × height)
-  - Sharpness (Laplacian variance — blur detection)
-  - Brightness (HSV colour space mean)
-  - Aspect ratio
-        │
-        ▼
-CLIP model generates 512-dimensional embedding per image
-(runs on your GPU via CUDA — fast)
-        │
-        ▼
-MongoDB stores the document:
-  { file_path, metadata, embeddings: [512 floats] }
-        │
-        ▼
-You search "mountain sunset"
-        │
-        ▼
-CLIP converts your text → 512-number vector
-Compare against all stored image vectors
-Apply CSS re-ranking (see below)
-        │
-        ▼
-Top matches returned — images served from their original disk location
-```
-
-### Why MongoDB Is the Right Database Here
-
-This project uses MongoDB deliberately — not just because it's a NoSQL course project, but because the problem genuinely requires what MongoDB provides:
-
-| Requirement | SQL | MongoDB |
-|---|---|---|
-| Store 512-float vector per image | ❌ Needs separate table, 512 rows per image | ✅ Native array in document |
-| Flexible schema — add fields later | ❌ `ALTER TABLE` required, locks table | ✅ Just add the field, no migration |
-| Hybrid filter + vector ranking | ❌ Fundamentally not possible | ✅ Single query pipeline |
-| Nested metadata (variable per image) | ❌ Rigid columns, nulls everywhere | ✅ Nested documents, any shape |
-| Horizontal scaling | ❌ Complex sharding setup | ✅ Built-in |
-
-**Schema evolution in practice:** Images are first ingested with just `metadata`. Embeddings are added in a second pass. Quality flags are added later. Every document has a different set of fields at different points in time — MongoDB handles this naturally. SQL would require three `ALTER TABLE` operations and careful migration scripts.
+- Natural language image search using CLIP
+- GPU-accelerated embedding generation
+- Automatic indexing of newly added images
+- Quality-aware reranking with Composite Semantic Similarity (CSS)
+- MongoDB-backed hybrid search using metadata filters plus vector ranking
+- Duplicate detection support
+- Local Flask dashboard
+- Local desktop search window
+- Face detection with InsightFace
+- Face clustering with DBSCAN
+- People tab for browsing discovered clusters
+- Manual naming of person clusters
 
 ---
 
-## The Novelty — Composite Semantic Similarity (CSS)
+## New Face Recognition / People Module
 
-Standard vector search has a real flaw: it ranks images purely by semantic closeness. A blurry, underexposed, low-quality photo of a mountain can outrank a sharp, well-lit one if its CLIP embedding happens to be marginally closer to the query vector. Semantic relevance and visual quality are independent — standard search ignores quality entirely.
+The project was extended with a face intelligence pipeline so the system can discover people across the image collection.
 
-**CSS** is a custom re-ranking algorithm that addresses this:
+### New capability
 
-```
-CSS(query, image) = α · cosine_similarity(query_vector, image_vector)
-                 + β · sharpness_score(image)
-                 + γ · brightness_score(image)
+For each indexed image, the system can now:
 
-Default weights:  α = 0.60   β = 0.25   γ = 0.15
-```
+1. Detect faces
+2. Extract a face embedding for each face
+3. Store those faces inside the image document in MongoDB
+4. Cluster similar faces into person groups
+5. Let the user browse those clusters in the UI
+6. Let the user assign a human-readable name to a cluster
 
-**Sharpness score** is derived from the Laplacian variance of the image — a standard computer vision metric for blur detection. Higher variance = sharper image. Normalised to [0, 1] with an empirical ceiling of 2000.
+### New modules
 
-**Brightness score** uses a tent function peaking at 0.5 (ideal exposure):
-```python
-brightness_score = max(0, 1 - abs(brightness - 0.5) * 2)
-```
-This penalises both underexposed (dark) and overexposed (washed out) images symmetrically.
+- `faces/face_detector.py`
+- `faces/face_clusterer.py`
+- `faces/__init__.py`
 
-All three signals are stored in MongoDB at ingest time — no additional computation at search time.
+### Face detection model
 
-### Evaluation Results
+Face detection and face embedding extraction are performed using InsightFace with the `buffalo_l` model.
 
-CSS is benchmarked against the pure cosine baseline using **Precision@K** — "of the top K results for a given query, what fraction are actually from the correct category?" Intel dataset folder labels (buildings, forest, glacier, mountain, sea, street) serve as ground truth exclusively for this measurement.
+This provides:
 
-| Query | P@5 Baseline | P@5 CSS | Δ@5 | P@10 Baseline | P@10 CSS | Δ@10 |
-|---|---|---|---|---|---|---|
-| urban buildings and architecture | 0.800 | 0.800 | +0.000 | 0.800 | 0.700 | -0.100 |
-| dense forest with trees | 1.000 | 1.000 | +0.000 | 0.900 | 1.000 | +0.100 |
-| glacier ice and snow | 1.000 | 0.800 | -0.200 | 1.000 | 0.900 | -0.100 |
-| mountain peak landscape | 0.400 | 0.800 | **+0.400** | 0.400 | 0.700 | **+0.300** |
-| sea ocean water waves | 1.000 | 1.000 | +0.000 | 0.900 | 0.900 | +0.000 |
-| street road city traffic | 0.600 | 1.000 | **+0.400** | 0.700 | 1.000 | **+0.300** |
-| **Average** | **0.800** | **0.900** | **+0.100** | **0.783** | **0.867** | **+0.083** |
+- face bounding boxes
+- face confidence score
+- normalized ArcFace-style face embeddings
 
-CSS improves average Precision@5 by **+10 percentage points** and Precision@10 by **+8.3 percentage points**. The largest gains are on ambiguous categories (mountain, street) where image quality acts as a meaningful tiebreaker between semantically similar candidates.
+### Face clustering
 
----
+Detected faces are clustered using DBSCAN over cosine distance between face embeddings.
 
-## System Architecture
+Why DBSCAN:
 
-### Threading Model
+- number of people does not need to be known in advance
+- singleton or bad detections can be treated as noise
+- works well for face-embedding clustering
 
-```
-start_debug.py / start.pyw
-        │
-        ▼
-TrayApp.start()
-        │
-        ├── Main Thread ──────── tkinter SearchWindow (required by tkinter)
-        │
-        ├── Thread 2 ─────────── pystray system tray icon + menu
-        │
-        ├── Thread 3 ─────────── Flask API (localhost:5000)
-        │
-        ├── Thread 4 ─────────── FolderWatcher (watchdog, monitors 5 folders)
-        │
-        └── Thread 5 ─────────── FullSystemScanner (background, auto on launch)
-```
+Cluster output:
 
-**Single shared CLIPEmbedder:** The CLIP model is loaded exactly once at startup (~3 seconds, ~600MB VRAM) and injected into every component that needs it — the scanner, watcher, Flask app, and search engines all share one instance via dependency injection.
-
-### Monitored Folders
-
-The system watches these folders by default (all subfolders included):
-
-```
-C:\Users\kbase\Downloads
-C:\Users\kbase\OneDrive\Desktop
-C:\Users\kbase\OneDrive\Documents
-C:\Users\kbase\OneDrive\Pictures
-C:\Users\kbase\Videos
-```
-
-System directories (`Windows\`, `AppData\`, `Program Files\`, etc.) and files under 50KB (icons, thumbnails) are automatically excluded.
+- real clusters are stored as IDs like `cluster_0000`, `cluster_0001`
+- unmatched faces are marked as `"noise"`
 
 ---
 
-## Project Structure
+## NoSQL Design and MongoDB Schema
 
-```
-media-intelligence-nosql/
-│
-├── tray/
-│   └── tray_app.py              # System tray orchestrator — boots all components
-│
-├── watcher/
-│   └── folder_watcher.py        # Watchdog file system monitor — auto-indexes new images
-│
-├── ui/
-│   └── search_window.py         # tkinter desktop search window
-│
-├── ingestion/
-│   ├── scanner.py               # Recursive image file discovery
-│   ├── metadata_extractor.py    # Blur score, brightness, resolution extraction
-│   ├── pipeline.py              # Batch ingestion pipeline
-│   └── full_scan.py             # Full system scan across all watched folders
-│
-├── embeddings/
-│   ├── clip_model.py            # CLIP ViT-B/32 wrapper — image + text embedding
-│   └── generate_embeddings.py   # Standalone batch embedding script
-│
-├── search/
-│   ├── semantic_search.py       # Baseline: pure cosine similarity search
-│   ├── hybrid_search.py         # CSS: composite quality-aware re-ranking
-│   ├── metadata_filters.py      # MongoDB pre-filter builders
-│   └── evaluation.py            # Precision@K benchmark (baseline vs CSS)
-│
-├── database/
-│   ├── mongo_connection.py      # MongoDB connection with error handling
-│   ├── schema_setup.py          # Collection and index creation
-│   └── media_repository.py      # All CRUD operations — single source of truth
-│
-├── quality/
-│   ├── duplicate_detector.py    # Near-duplicate detection via cosine threshold
-│   └── image_quality.py         # Quality tier tagging (high / medium / low)
-│
-├── templates/
-│   └── index.html               # Web dashboard (search + compare + evaluate tabs)
-│
-├── utils/
-│   ├── config.py                # All configuration — paths, weights, thresholds
-│   └── file_utils.py            # Supported image extension helpers
-│
-├── scripts/
-│   ├── ingest_dataset.py        # Standalone ingestion script
-│   └── run_search_demo.py       # CLI demo: baseline vs CSS side-by-side
-│
-├── intel_dataset/               # Intel Image Classification dataset (evaluation only)
-│   └── seg_test/seg_test/       # 3000 labeled images across 6 categories
-│
-├── app.py                       # Flask REST API
-├── main.py                      # CLI entry point
-├── start.pyw                    # Silent production launcher (no terminal window)
-├── start_debug.py               # Development launcher (terminal visible)
-└── requirements.txt
-```
+This project is a strong MongoDB / NoSQL use case because each image document evolves over time and stores multiple nested intelligence layers.
 
----
+### Existing schema before face work
 
-## MongoDB Document Schema
+Each image already stored:
 
-Every image is stored as a single self-contained document:
+- basic identity fields
+- file path
+- image metadata
+- CLIP embedding
+- quality flags
+
+Example:
 
 ```json
 {
-  "file_id":    "3f7a2b1c-...",
-  "file_path":  "C:/Users/kbase/Pictures/holiday/beach.jpg",
-  "file_name":  "beach.jpg",
+  "file_id": "3f7a2b1c-...",
+  "file_path": "C:/Users/kbase/Pictures/holiday/beach.jpg",
+  "file_name": "beach.jpg",
   "media_type": "image",
   "metadata": {
-    "width":        4032,
-    "height":       3024,
-    "brightness":   0.61,
-    "blur_score":   812.4,
+    "width": 4032,
+    "height": 3024,
+    "brightness": 0.61,
+    "blur_score": 812.4,
     "aspect_ratio": 1.333
   },
   "embeddings": {
-    "clip_image": [0.023, -0.141, 0.334, "... 512 floats total"]
+    "clip_image": [0.023, -0.141, 0.334]
   },
-  "quality_flags": {
-    "is_blurry":      false,
-    "is_dark":        false,
-    "is_overexposed": false,
-    "quality_tier":   "high"
-  }
+  "quality_flags": {}
 }
 ```
 
-**The image file itself is never copied or moved.** MongoDB stores only the path, metadata, and the 2KB embedding vector. Storage overhead: ~2KB per image. For 50,000 photos, the entire MongoDB database is under 200MB.
+### Face schema added in this update
 
-**Indexes created:**
-- `file_id` (unique) — fast document lookup
-- `file_path` (unique) — duplicate check on ingest
-- `metadata.blur_score` — used by hybrid search filters
-- `metadata.brightness` — used by hybrid search filters
-- `metadata.width` — used by resolution filters
+A new top-level `faces` array was added to each media document.
+
+Each element is a nested face sub-document:
+
+```json
+{
+  "face_id": "uuid",
+  "bbox": [x1, y1, x2, y2],
+  "embedding": [0.12, -0.04, 0.88],
+  "det_score": 0.98,
+  "cluster_id": "cluster_0003",
+  "person_label": "Sarah"
+}
+```
+
+Full image document after this update:
+
+```json
+{
+  "file_id": "3f7a2b1c-...",
+  "file_path": "C:/Users/kbase/Pictures/holiday/beach.jpg",
+  "file_name": "beach.jpg",
+  "media_type": "image",
+  "metadata": {
+    "width": 4032,
+    "height": 3024,
+    "brightness": 0.61,
+    "blur_score": 812.4,
+    "aspect_ratio": 1.333
+  },
+  "embeddings": {
+    "clip_image": [0.023, -0.141, 0.334]
+  },
+  "quality_flags": {},
+  "faces": [
+    {
+      "face_id": "4f3d3a0d-31b9-40fa-8b17-2a8a517e4c01",
+      "bbox": [120, 45, 262, 211],
+      "embedding": [0.12, -0.04, 0.88],
+      "det_score": 0.98,
+      "cluster_id": "cluster_0003",
+      "person_label": "Sarah"
+    }
+  ]
+}
+```
+
+### Meaning of face states in MongoDB
+
+- `faces` field missing:
+  the document has not yet been face-processed
+- `"faces": []`:
+  the document has been processed and no faces were found
+- `cluster_id = null`:
+  the face was detected but has not yet been clustered
+- `cluster_id = "noise"`:
+  the face was processed but did not belong to a stable cluster
+- `person_label = null`:
+  no manual label has been assigned yet
+
+### Why MongoDB fits especially well
+
+MongoDB works well here because:
+
+- image documents can evolve over time without schema migrations
+- CLIP embeddings are stored as arrays directly in the document
+- face arrays model one-to-many image-to-face relationships naturally
+- nested sub-documents avoid SQL joins
+- array filters let us update specific faces inside a document
 
 ---
 
-## Tech Stack
+## Processing Pipeline
 
-| Component | Technology |
-|---|---|
-| Language | Python 3.11 |
-| Database | MongoDB (local, port 27017) |
-| AI Model | CLIP ViT-B/32 via HuggingFace Transformers |
-| ML Framework | PyTorch 2.8.0 + CUDA 12.8 |
-| GPU | NVIDIA RTX 4060 (auto-detected via `torch.cuda.is_available()`) |
-| DB Driver | PyMongo 4.6.1 |
-| Image Processing | OpenCV, Pillow |
-| Web Framework | Flask |
-| Desktop UI | tkinter (built-in Python) |
-| System Tray | pystray |
-| File Watching | watchdog |
-| Environment | Anaconda (conda env: SIH) |
+### Semantic image pipeline
+
+```text
+Image on disk
+  -> metadata extraction
+  -> CLIP image embedding
+  -> MongoDB storage
+  -> natural language text query
+  -> CLIP text embedding
+  -> cosine similarity search
+  -> CSS reranking
+```
+
+### Face pipeline
+
+```text
+Indexed image
+  -> InsightFace detects faces
+  -> one face embedding per detected face
+  -> save faces[] inside MongoDB image document
+  -> full-scan or manual recluster
+  -> DBSCAN groups similar faces
+  -> write cluster_id back to each face sub-document
+  -> UI shows one representative face per cluster
+  -> user can assign person_label to the cluster
+```
+
+### Backfill behavior for old indexed images
+
+One major part of this update was support for backfilling faces onto already indexed MongoDB documents.
+
+Problem solved:
+
+- initially, only newly inserted images got face detection
+- older indexed images were skipped
+- therefore the People tab could show zero clusters even though the database already had many images
+
+Current behavior:
+
+- new images get faces detected during ingest
+- old documents that do not yet have a `faces` field are face-processed during full scan
+- images with no faces are explicitly saved as `faces: []`
+
+This makes the NoSQL state complete and prevents endless reprocessing of non-face images.
 
 ---
 
-## Setup & Installation
+## Search and Ranking
+
+### CLIP embeddings
+
+The system uses CLIP to place images and text into the same vector space. Search becomes a cosine-similarity problem between:
+
+- query text embedding
+- stored image embeddings
+
+### CSS reranking
+
+Composite Semantic Similarity (CSS) improves ranking by combining:
+
+- semantic cosine similarity
+- sharpness score
+- brightness score
+
+Formula:
+
+```text
+CSS(query, image) =
+    alpha * cosine_similarity
+  + beta  * sharpness_score
+  + gamma * brightness_score
+```
+
+This helps rank visually better images above semantically similar but poor-quality ones.
+
+---
+
+## Application Architecture
+
+### Runtime components
+
+- `tray/tray_app.py`
+  system tray orchestrator
+- `watcher/folder_watcher.py`
+  automatic indexing of new files
+- `ingestion/full_scan.py`
+  full library scan and face backfill
+- `app.py`
+  Flask API and browser UI
+- `ui/search_window.py`
+  tkinter desktop search UI
+
+### Important folders
+
+```text
+media-intelligence-nosql/
+|
+|-- app.py
+|-- main.py
+|-- start.pyw
+|-- start_debug.py
+|
+|-- database/
+|   |-- mongo_connection.py
+|   |-- schema_setup.py
+|   `-- media_repository.py
+|
+|-- embeddings/
+|   |-- clip_model.py
+|   `-- generate_embeddings.py
+|
+|-- faces/
+|   |-- __init__.py
+|   |-- face_detector.py
+|   `-- face_clusterer.py
+|
+|-- ingestion/
+|   |-- scanner.py
+|   |-- metadata_extractor.py
+|   |-- pipeline.py
+|   `-- full_scan.py
+|
+|-- search/
+|   |-- semantic_search.py
+|   |-- hybrid_search.py
+|   |-- metadata_filters.py
+|   `-- evaluation.py
+|
+|-- templates/
+|   `-- index.html
+|
+|-- tray/
+|   `-- tray_app.py
+|
+|-- ui/
+|   `-- search_window.py
+|
+`-- watcher/
+    `-- folder_watcher.py
+```
+
+---
+
+## API Endpoints
+
+### Existing endpoints
+
+- `GET /api/search`
+- `GET /api/compare`
+- `GET /api/evaluate`
+- `GET /api/stats`
+- `GET /image`
+
+### New people / face endpoints
+
+- `GET /api/people`
+  returns cluster representatives for the People grid
+- `GET /api/people/<cluster_id>`
+  returns all images/faces in that cluster
+- `POST /api/people/<cluster_id>/label`
+  applies a human-readable name to the cluster
+- `POST /api/people/recluster`
+  reruns face clustering
+- `GET /face`
+  dynamically crops and serves a face from the original image using the stored bounding box
+
+---
+
+## UI Additions
+
+The web dashboard now has a fourth tab:
+
+- Results
+- Baseline vs CSS
+- Evaluation
+- People
+
+### People tab behavior
+
+- shows one representative face thumbnail per cluster
+- shows cluster size
+- opens cluster detail view on click
+- shows all matching images/faces in that cluster
+- supports manual labeling of a cluster
+- supports manual reclustering
+
+The system tray also now has a face-related action:
+
+- `Recluster Faces`
+
+---
+
+## Repository / Data Access Changes
+
+The repository layer in `database/media_repository.py` was extended to support face-aware NoSQL operations.
+
+### New repository methods
+
+- `upsert_faces(file_path, faces)`
+- `get_all_faces()`
+- `update_face_clusters(face_to_cluster)`
+- `update_person_label(cluster_id, person_label)`
+- `search_by_person(person_label)`
+- `get_faces_by_cluster(cluster_id)`
+- `remove_face_from_cluster(face_id)`
+- `count_face_clusters()`
+- `needs_face_processing(file_path)`
+
+### MongoDB-specific techniques used
+
+- nested array storage for `faces`
+- `array_filters` to update selected face elements
+- distinct cluster counting using nested `faces.cluster_id`
+- state detection via existence / absence of `faces`
+
+---
+
+## Setup
 
 ### Prerequisites
 
-- Python 3.11+ (Anaconda recommended)
-- MongoDB running locally on port 27017
-- NVIDIA GPU with CUDA drivers (CPU fallback works but is slower)
+- Python 3.11+
+- MongoDB running locally on port `27017`
+- Conda environment recommended
+- NVIDIA GPU optional but recommended
 
-### Install Dependencies
+### Install dependencies
 
 ```bash
 conda activate SIH
 pip install transformers pymongo flask pystray watchdog Pillow opencv-python torch torchvision tqdm
+pip install insightface scikit-learn onnxruntime-gpu
 ```
 
-For CUDA-enabled PyTorch (if not already installed):
-```bash
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-```
+### Configure watched folders
 
-### Configure Watched Folders
+Edit `utils/config.py` and update `WATCHED_FOLDERS` for your machine.
 
-Open `utils/config.py` and update `WATCHED_FOLDERS` to match your machine:
+Example:
 
 ```python
 WATCHED_FOLDERS = [
@@ -335,9 +450,9 @@ WATCHED_FOLDERS = [
 
 ---
 
-## Running the Application
+## Running the System
 
-### Full System (Recommended)
+### Recommended launch
 
 ```bash
 conda activate SIH
@@ -345,61 +460,133 @@ cd path/to/media-intelligence-nosql
 python start_debug.py
 ```
 
-On launch:
-1. CLIP model loads on GPU (~3 seconds)
-2. Flask API starts at `http://127.0.0.1:5000`
-3. Folder watcher begins monitoring all configured folders
-4. Background scan starts automatically across all watched folders
-5. System tray icon appears — click to open search window
+What happens on startup:
 
-### Auto-Start on Windows Login
+1. CLIP loads
+2. Flask starts at `http://127.0.0.1:5000`
+3. folder watcher starts
+4. full scan starts automatically
+5. old documents can be backfilled with face data
+6. face clustering runs after scan
 
-1. Press `Win+R`, type `shell:startup`, press Enter
-2. Create a new shortcut with:
-   - **Target:** `C:\path\to\anaconda3\envs\SIH\pythonw.exe start.pyw`
-   - **Start in:** `C:\path\to\media-intelligence-nosql`
+### CLI note
 
-### CLI (Without Tray App)
+`main.py` is a CLI command entry point and expects a subcommand.
+
+Examples:
 
 ```bash
-python main.py setup              # Initialise database schema
-python main.py ingest             # Ingest images from configured folder
-python main.py embed              # Generate CLIP embeddings
-python main.py stats              # Show database statistics
-python main.py search "query"     # CSS search
-python main.py search "query" --baseline   # Cosine baseline
-python main.py compare "query"    # Side-by-side comparison
-python main.py evaluate           # Run Precision@K benchmark
-python main.py duplicates         # Find near-duplicate images
+python main.py setup
+python main.py stats
+python main.py search "forest trail"
+python main.py compare "mountain sunset"
+python main.py evaluate
 ```
 
-### Web Dashboard
+### Standalone web dashboard
 
 ```bash
 python app.py
-# Open http://localhost:5000
 ```
 
-Three tabs:
-- **Results** — search with quality filter sliders (min sharpness, min brightness)
-- **Baseline vs CSS** — same query, both methods side by side
-- **Evaluation** — live Precision@K benchmark table
+Open:
+
+```text
+http://127.0.0.1:5000
+```
+
+---
+
+## How to Verify Face Processing
+
+After running the system, you can verify that backfill and clustering completed.
+
+### Terminal indicators
+
+Look for:
+
+```text
+Scan complete - X new images indexed, Y existing images face-processed, Z skipped.
+[Scan] Face clustering done: N people, M unmatched faces.
+```
+
+### MongoDB verification commands
+
+Documents still missing face processing:
+
+```bash
+python -c "from database.media_repository import MediaRepository; repo=MediaRepository(); print(repo.collection.count_documents({'faces': {'$exists': False}}))"
+```
+
+Documents with at least one detected face:
+
+```bash
+python -c "from database.media_repository import MediaRepository; repo=MediaRepository(); print(repo.collection.count_documents({'faces.0': {'$exists': True}}))"
+```
+
+Cluster count:
+
+```bash
+python -c "from database.media_repository import MediaRepository; repo=MediaRepository(); print(len(repo.collection.distinct('faces.cluster_id', {'faces.cluster_id': {'$nin': [None, 'noise']}})))"
+```
 
 ---
 
 ## Limitations
 
-- **In-memory vector search:** Cosine similarity is computed in Python across all documents. For the current dataset size this is fast; at 100k+ images, MongoDB Atlas Vector Search or FAISS would be needed for sub-second response.
-- **Static CSS weights:** The α/β/γ weights are manually tuned. A learned weighting via user feedback would improve personalisation.
-- **Local machine only:** Absolute file paths are stored. Moving images or running on a different machine requires re-indexing.
-- **CLIP limitations:** Performance degrades on highly domain-specific images (medical scans, technical diagrams, handwritten text).
+- face clustering currently builds a full cosine-distance matrix in memory, which may become expensive for very large face collections
+- clustering is batch-oriented and not incremental
+- false positives are possible on tiny faces, profile faces, screenshots, or illustrations
+- absolute file paths are stored, so moving files across machines requires re-indexing
+- search currently uses in-memory ranking rather than a dedicated ANN vector index
 
 ---
 
-## Possible Extensions
+## Possible Future Extensions
 
-- **Face recognition** — detect and cluster faces across the library, name people, enable "show photos of Sarah" search. Face embeddings stored as sub-document arrays inside image documents — a strong additional NoSQL justification.
-- **MongoDB Atlas Vector Search** — replace in-memory cosine with native `$vectorSearch` operator for ANN indexing at scale
-- **Adaptive CSS weights** — tune α/β/γ per user via implicit feedback (click-through data stored in MongoDB)
-- **Mobile companion app** — REST API already exists, attach a mobile client
-- **Video support** — extract keyframes, embed and index them alongside images
+- person-name search integrated directly into the semantic search bar
+- manual cluster merge / split operations in the UI
+- exclude folders from face processing separately from semantic indexing
+- move from in-memory search to FAISS or MongoDB Atlas Vector Search
+- incremental face clustering for newly added images
+- video face keyframe support
+
+---
+
+## Tech Stack
+
+| Component | Technology |
+|---|---|
+| Language | Python 3.11 |
+| Database | MongoDB |
+| Image-text embeddings | OpenAI CLIP via HuggingFace Transformers |
+| Face detection / face embeddings | InsightFace |
+| Face clustering | scikit-learn DBSCAN |
+| Deep learning runtime | PyTorch |
+| ONNX runtime | onnxruntime-gpu |
+| Image processing | OpenCV, Pillow |
+| Web framework | Flask |
+| Desktop UI | tkinter |
+| Tray integration | pystray |
+| File watching | watchdog |
+
+---
+
+## Summary
+
+This project started as a local semantic image search system and was extended into a richer NoSQL media intelligence platform.
+
+The major additions in this update are:
+
+- face detection
+- face embedding extraction
+- nested face storage in MongoDB
+- face clustering
+- People tab in the UI
+- person labeling
+- backfill support for already indexed documents
+
+This makes the project stronger both as:
+
+- an AI-powered media retrieval system
+- a NoSQL project demonstrating evolving schema, nested documents, and document-centric design

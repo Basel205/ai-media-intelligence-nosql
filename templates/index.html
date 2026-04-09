@@ -2,500 +2,882 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Media Intelligence — Semantic Search</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Media Intelligence</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; }
 
     :root {
-      --bg:       #0f1117;
-      --surface:  #1a1d27;
-      --card:     #21253a;
-      --border:   #2e3350;
-      --accent:   #6366f1;
-      --accent2:  #10b981;
-      --text:     #e2e8f0;
-      --muted:    #64748b;
-      --danger:   #f43f5e;
-      --radius:   10px;
+      --bg: #0d1117;
+      --surface: #121924;
+      --card: #192233;
+      --card-2: #22304a;
+      --line: #31415f;
+      --text: #ecf3ff;
+      --muted: #94a6c6;
+      --accent: #ff7a18;
+      --accent-soft: #ffb067;
+      --good: #1ec48d;
+      --danger: #ff5d73;
+      --radius: 16px;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
     }
 
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(255, 122, 24, 0.15), transparent 25%),
+        radial-gradient(circle at top right, rgba(30, 196, 141, 0.12), transparent 22%),
+        linear-gradient(180deg, #091019 0%, var(--bg) 40%);
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
 
-    /* ── Header ── */
     header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(18px);
+      background: rgba(9, 16, 25, 0.82);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1.15rem 1.5rem;
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
       gap: 1rem;
     }
-    header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: .02em; }
-    header h1 span { color: var(--accent); }
-    .stats-bar { display: flex; gap: 1.5rem; font-size: .8rem; color: var(--muted); }
-    .stats-bar b { color: var(--text); }
 
-    /* ── Main layout ── */
-    main { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+    h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
 
-    /* ── Search box ── */
-    .search-section {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+    h1 span { color: var(--accent-soft); }
+
+    #stats-bar {
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
       padding: 1.5rem;
-      margin-bottom: 1.5rem;
     }
-    .search-row { display: flex; gap: .75rem; margin-bottom: 1rem; }
-    #query-input {
-      flex: 1;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-size: 1rem;
-      padding: .75rem 1rem;
-      outline: none;
-      transition: border-color .2s;
+
+    .panel {
+      background: rgba(18, 25, 36, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
     }
-    #query-input:focus { border-color: var(--accent); }
-    .btn {
-      background: var(--accent);
-      border: none;
-      border-radius: 8px;
-      color: #fff;
-      cursor: pointer;
-      font-size: .9rem;
-      font-weight: 600;
-      padding: .75rem 1.5rem;
-      transition: opacity .15s;
-      white-space: nowrap;
+
+    .search-panel {
+      padding: 1.35rem;
+      margin-bottom: 1.25rem;
     }
-    .btn:hover { opacity: .85; }
-    .btn.secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
-    .btn.green { background: var(--accent2); }
 
-    /* Method toggle */
-    .controls { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
-    .toggle-group { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-    .toggle-btn {
-      background: var(--card);
-      border: none;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: .85rem;
-      padding: .5rem 1rem;
-      transition: all .15s;
-    }
-    .toggle-btn.active { background: var(--accent); color: #fff; font-weight: 600; }
-
-    /* Filters */
-    .filters { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: .75rem; }
-    .filter-item { display: flex; flex-direction: column; gap: .2rem; font-size: .78rem; color: var(--muted); }
-    .filter-item input[type=range] { accent-color: var(--accent); width: 130px; }
-    .filter-item .val { color: var(--text); font-weight: 600; }
-
-    /* ── Tabs ── */
-    .tab-bar { display: flex; gap: .5rem; margin-bottom: 1rem; }
-    .tab {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: .85rem;
-      padding: .5rem 1.1rem;
-      transition: all .15s;
-    }
-    .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-
-    /* ── Results panel ── */
-    #results-panel, #compare-panel, #eval-panel { display: none; }
-    #results-panel.visible, #compare-panel.visible, #eval-panel.visible { display: block; }
-
-    .results-header {
-      color: var(--muted);
-      font-size: .85rem;
+    .search-row {
+      display: flex;
+      gap: 0.8rem;
       margin-bottom: 1rem;
     }
-    .results-header b { color: var(--text); }
 
-    /* Image grid */
-    .image-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 1rem;
-    }
-    .image-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      transition: transform .15s, border-color .15s;
-      cursor: pointer;
-    }
-    .image-card:hover { transform: translateY(-3px); border-color: var(--accent); }
-    .image-card img {
+    input[type="text"], select {
       width: 100%;
-      aspect-ratio: 4/3;
-      object-fit: cover;
-      display: block;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      font: inherit;
+      outline: none;
     }
-    .image-card .card-body { padding: .6rem .75rem; }
-    .image-card .fname { font-size: .78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .score-row { display: flex; justify-content: space-between; align-items: center; margin-top: .3rem; }
-    .score-badge {
-      font-size: .75rem;
+
+    input[type="text"]:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(255, 122, 24, 0.14);
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 12px;
+      padding: 0.85rem 1.15rem;
+      font: inherit;
       font-weight: 700;
-      border-radius: 5px;
-      padding: .15rem .5rem;
+      color: white;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+      background: linear-gradient(135deg, var(--accent) 0%, #ff9147 100%);
     }
-    .score-badge.css      { background: rgba(99,102,241,.2); color: #a5b4fc; }
-    .score-badge.baseline { background: rgba(100,116,139,.15); color: var(--muted); }
-    .rank { font-size: .72rem; color: var(--muted); }
 
-    /* ── Compare panel ── */
-    .compare-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-    .col-header { font-size: .85rem; font-weight: 700; margin-bottom: .75rem; padding: .4rem .75rem; border-radius: 6px; }
-    .col-header.baseline-col { background: rgba(100,116,139,.15); color: var(--muted); }
-    .col-header.css-col      { background: rgba(99,102,241,.15);  color: #a5b4fc; }
-    .compare-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .75rem; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn.secondary {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--line);
+      color: var(--text);
+    }
+    .btn.green {
+      background: linear-gradient(135deg, #17b67f 0%, #33d9a1 100%);
+    }
 
-    /* ── Evaluation panel ── */
-    #eval-table-wrap { overflow-x: auto; }
-    table { border-collapse: collapse; width: 100%; font-size: .85rem; }
-    th, td { border: 1px solid var(--border); padding: .55rem .9rem; text-align: left; }
-    th { background: var(--card); color: var(--muted); font-weight: 600; }
-    tr:nth-child(even) { background: rgba(255,255,255,.02); }
-    .delta-pos { color: var(--accent2); font-weight: 700; }
-    .delta-neg { color: var(--danger); }
-    .avg-row td { background: var(--surface); font-weight: 700; border-top: 2px solid var(--border); }
+    .controls, .filters, .people-actions, .people-detail-header, .cluster-label-row {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
 
-    /* ── Loading ── */
+    .filters {
+      margin-top: 0.9rem;
+    }
+
+    .filter-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .filter-item input[type="range"] {
+      width: 150px;
+      accent-color: var(--accent);
+    }
+
+    .toggle-group, .tab-bar {
+      display: flex;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+    }
+
+    .toggle-btn, .tab {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 0.6rem 1rem;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.88rem;
+      transition: 0.15s ease;
+    }
+
+    .toggle-btn.active, .tab.active {
+      background: rgba(255, 122, 24, 0.18);
+      border-color: rgba(255, 122, 24, 0.55);
+      color: var(--text);
+    }
+
+    .tab-bar { margin-bottom: 1rem; }
+
+    .view { display: none; }
+    .view.visible { display: block; }
+
+    .status-line {
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin-bottom: 1rem;
+    }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 3rem 1rem;
+    }
+
     .spinner {
-      border: 3px solid var(--border);
-      border-top-color: var(--accent);
+      width: 40px;
+      height: 40px;
+      margin: 2.5rem auto;
       border-radius: 50%;
-      width: 36px; height: 36px;
-      animation: spin .7s linear infinite;
-      margin: 3rem auto;
+      border: 4px solid rgba(255, 255, 255, 0.08);
+      border-top-color: var(--accent);
+      animation: spin 0.75s linear infinite;
     }
+
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Empty state ── */
-    .empty { text-align: center; color: var(--muted); padding: 4rem 1rem; font-size: .95rem; }
+    .image-grid, .cluster-grid, .face-grid {
+      display: grid;
+      gap: 1rem;
+    }
 
-    /* ── Modal ── */
+    .image-grid, .cluster-grid {
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+
+    .face-grid {
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(34, 48, 74, 0.82) 0%, rgba(21, 29, 45, 0.98) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255, 176, 103, 0.5);
+    }
+
+    .card img {
+      width: 100%;
+      display: block;
+      object-fit: cover;
+      background: #0f1726;
+    }
+
+    .image-card img { aspect-ratio: 4 / 3; }
+    .cluster-card img, .face-card img { aspect-ratio: 1 / 1; }
+
+    .card-body {
+      padding: 0.85rem 0.9rem 0.95rem;
+    }
+
+    .card-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 0.3rem;
+    }
+
+    .card-subtitle, .mini-meta {
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.45;
+    }
+
+    .score-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.6rem;
+      margin-top: 0.55rem;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 0.25rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .pill.css { background: rgba(255, 122, 24, 0.16); color: #ffc390; }
+    .pill.baseline { background: rgba(148, 166, 198, 0.16); color: #d5dff0; }
+    .pill.people { background: rgba(30, 196, 141, 0.15); color: #88f0cb; }
+
+    .compare-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .compare-col {
+      padding: 1rem;
+    }
+
+    .compare-title {
+      margin-bottom: 0.9rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .people-layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) 1fr;
+      gap: 1rem;
+    }
+
+    .people-sidebar, .people-detail {
+      padding: 1rem;
+      min-height: 420px;
+    }
+
+    .people-detail {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .detail-scroll {
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+
+    th, td {
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 0.7rem 0.8rem;
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .delta-pos { color: var(--good); font-weight: 700; }
+    .delta-neg { color: var(--danger); }
+
+    .message {
+      padding: 0.8rem 0.9rem;
+      border-radius: 12px;
+      font-size: 0.85rem;
+    }
+
+    .message.ok { background: rgba(30, 196, 141, 0.12); color: #9df2d1; }
+    .message.error { background: rgba(255, 93, 115, 0.12); color: #ffb2bd; }
+
     #modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
       display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,.8);
-      z-index: 100;
       align-items: center;
       justify-content: center;
+      padding: 1rem;
+      z-index: 50;
     }
+
     #modal-overlay.open { display: flex; }
+
     #modal-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      max-width: 700px; width: 90%;
-      padding: 1.5rem;
+      width: min(900px, 100%);
+      background: #0e1522;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 18px;
+      padding: 1rem;
     }
-    #modal-img { width: 100%; border-radius: 8px; margin-bottom: 1rem; }
-    #modal-meta { font-size: .82rem; color: var(--muted); line-height: 1.8; }
-    #modal-meta b { color: var(--text); }
-    #modal-close { float: right; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.3rem; }
+
+    #modal-img {
+      width: 100%;
+      max-height: 70vh;
+      object-fit: contain;
+      border-radius: 14px;
+      background: #0a1018;
+    }
+
+    #modal-close {
+      float: right;
+      background: none;
+      border: 0;
+      color: var(--muted);
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+
+    #modal-meta {
+      margin-top: 0.9rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 950px) {
+      .compare-columns, .people-layout { grid-template-columns: 1fr; }
+    }
 
     @media (max-width: 700px) {
-      .compare-columns { grid-template-columns: 1fr; }
-      header { flex-direction: column; align-items: flex-start; }
+      .header-inner, .search-row { flex-direction: column; align-items: stretch; }
+      main { padding: 1rem; }
+      .search-panel { padding: 1rem; }
     }
   </style>
 </head>
 <body>
-
-<header>
-  <h1>🔍 Media <span>Intelligence</span></h1>
-  <div class="stats-bar" id="stats-bar">Loading stats...</div>
-</header>
-
-<main>
-
-  <!-- Search Section -->
-  <div class="search-section">
-    <div class="search-row">
-      <input id="query-input" type="text" placeholder='Search images... e.g. "sea waves", "mountain forest"' />
-      <button class="btn" onclick="doSearch()">Search</button>
-      <button class="btn secondary" onclick="doCompare()">Compare</button>
+  <header>
+    <div class="header-inner">
+      <h1>Media <span>Intelligence</span></h1>
+      <div id="stats-bar">Loading stats...</div>
     </div>
+  </header>
 
-    <div class="controls">
-      <div>
-        <div style="font-size:.78rem;color:var(--muted);margin-bottom:.35rem;">Search Method</div>
-        <div class="toggle-group">
-          <button class="toggle-btn active" id="btn-css"      onclick="setMethod('css')">CSS (Novel)</button>
-          <button class="toggle-btn"        id="btn-baseline" onclick="setMethod('baseline')">Baseline Cosine</button>
+  <main>
+    <section class="panel search-panel">
+      <div class="search-row">
+        <input id="query-input" type="text" placeholder='Search images, for example "forest trail" or "city skyline"' />
+        <button class="btn" onclick="doSearch()">Search</button>
+        <button class="btn secondary" onclick="doCompare()">Compare</button>
+      </div>
+
+      <div class="controls">
+        <div>
+          <div class="mini-meta" style="margin-bottom:0.45rem;">Search method</div>
+          <div class="toggle-group">
+            <button class="toggle-btn active" id="btn-css" onclick="setMethod('css')">CSS</button>
+            <button class="toggle-btn" id="btn-baseline" onclick="setMethod('baseline')">Baseline</button>
+          </div>
         </div>
       </div>
 
-      <div id="filter-section" class="filters">
-        <div class="filter-item">
-          <span>Min Sharpness <span class="val" id="blur-val">OFF</span></span>
-          <input type="range" id="min-blur" min="0" max="500" value="0" step="10"
-                 oninput="document.getElementById('blur-val').textContent = this.value > 0 ? this.value : 'OFF'" />
-        </div>
-        <div class="filter-item">
-          <span>Min Brightness <span class="val" id="bright-val">OFF</span></span>
-          <input type="range" id="min-brightness" min="0" max="0.8" value="0" step="0.05"
-                 oninput="document.getElementById('bright-val').textContent = this.value > 0 ? this.value : 'OFF'" />
-        </div>
-        <div class="filter-item">
+      <div class="filters" id="filter-section">
+        <label class="filter-item">
+          <span>Min sharpness <strong id="blur-val">OFF</strong></span>
+          <input type="range" id="min-blur" min="0" max="500" value="0" step="10" />
+        </label>
+        <label class="filter-item">
+          <span>Min brightness <strong id="bright-val">OFF</strong></span>
+          <input type="range" id="min-brightness" min="0" max="0.8" value="0" step="0.05" />
+        </label>
+        <label class="filter-item">
           <span>Results</span>
-          <select id="top-k" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:.3rem .6rem;font-size:.85rem;">
+          <select id="top-k">
             <option value="6">6</option>
             <option value="12" selected>12</option>
             <option value="24">24</option>
           </select>
+        </label>
+      </div>
+    </section>
+
+    <div class="tab-bar">
+      <button class="tab active" id="tab-results" onclick="switchTab('results')">Results</button>
+      <button class="tab" id="tab-compare" onclick="switchTab('compare')">Baseline vs CSS</button>
+      <button class="tab" id="tab-eval" onclick="switchTab('eval')">Evaluation</button>
+      <button class="tab" id="tab-people" onclick="switchTab('people')">People</button>
+    </div>
+
+    <section id="results-panel" class="view visible panel" style="padding:1rem;">
+      <div class="empty">Enter a search query to find images.</div>
+    </section>
+
+    <section id="compare-panel" class="view panel">
+      <div class="empty">Use Compare to see both ranking methods side by side.</div>
+    </section>
+
+    <section id="eval-panel" class="view panel" style="padding:1rem;">
+      <div class="status-line">Runs Precision@5 and Precision@10 for the dataset queries.</div>
+      <button class="btn green" onclick="runEval()">Run evaluation</button>
+      <div id="eval-content" style="margin-top:1rem;"></div>
+    </section>
+
+    <section id="people-panel" class="view">
+      <div class="people-layout">
+        <div class="panel people-sidebar">
+          <div class="people-detail-header" style="justify-content:space-between; margin-bottom:1rem;">
+            <div>
+              <div class="card-title">People clusters</div>
+              <div class="card-subtitle">Grouped faces detected across indexed photos.</div>
+            </div>
+            <div class="people-actions">
+              <button class="btn secondary" onclick="loadPeople()">Refresh</button>
+              <button class="btn green" onclick="reclusterPeople()">Recluster</button>
+            </div>
+          </div>
+          <div id="people-status" class="card-subtitle" style="margin-bottom:0.85rem;">Loading clusters...</div>
+          <div id="people-list"></div>
+        </div>
+
+        <div class="panel people-detail">
+          <div id="people-detail-header">
+            <div class="card-title">Person detail</div>
+            <div class="card-subtitle">Pick a cluster to review its images and assign a label.</div>
+          </div>
+          <div id="people-feedback"></div>
+          <div id="people-detail-body" class="detail-scroll">
+            <div class="empty">Select a cluster from the left to inspect it.</div>
+          </div>
         </div>
       </div>
+    </section>
+  </main>
+
+  <div id="modal-overlay" onclick="closeModal()">
+    <div id="modal-box" onclick="event.stopPropagation()">
+      <button id="modal-close" onclick="closeModal()">x</button>
+      <img id="modal-img" src="" alt="" />
+      <div id="modal-meta"></div>
     </div>
   </div>
 
-  <!-- Tab bar -->
-  <div class="tab-bar">
-    <button class="tab active" id="tab-results"  onclick="switchTab('results')">Results</button>
-    <button class="tab"        id="tab-compare"  onclick="switchTab('compare')">Baseline vs CSS</button>
-    <button class="tab"        id="tab-eval"     onclick="switchTab('eval')">Evaluation</button>
-  </div>
+  <script>
+    let currentMethod = "css";
+    let activeTab = "results";
+    let selectedClusterId = null;
 
-  <!-- Results panel -->
-  <div id="results-panel" class="visible">
-    <div class="empty">Enter a search query above to find images.</div>
-  </div>
+    window.onload = () => {
+      loadStats();
+      loadPeople();
 
-  <!-- Compare panel -->
-  <div id="compare-panel">
-    <div class="empty">Press <b>Compare</b> to see Baseline vs CSS side by side.</div>
-  </div>
+      document.getElementById("query-input").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") doSearch();
+      });
 
-  <!-- Evaluation panel -->
-  <div id="eval-panel">
-    <p style="color:var(--muted);font-size:.85rem;margin-bottom:1rem;">
-      Runs Precision@5 and Precision@10 for 6 standard queries.
-      Uses Intel dataset folder labels as ground truth. Takes ~30 seconds.
-    </p>
-    <button class="btn green" onclick="runEval()">Run Evaluation</button>
-    <div id="eval-content" style="margin-top:1.5rem;"></div>
-  </div>
+      document.getElementById("min-blur").addEventListener("input", syncFilterLabels);
+      document.getElementById("min-brightness").addEventListener("input", syncFilterLabels);
+      syncFilterLabels();
+    };
 
-</main>
-
-<!-- Image Modal -->
-<div id="modal-overlay" onclick="closeModal()">
-  <div id="modal-box" onclick="event.stopPropagation()">
-    <button id="modal-close" onclick="closeModal()">✕</button>
-    <img id="modal-img" src="" alt="" />
-    <div id="modal-meta"></div>
-  </div>
-</div>
-
-<script>
-  let currentMethod = 'css';
-  let lastQuery = '';
-
-  // ── Init ─────────────────────────────────────────────────────────────────
-  window.onload = () => {
-    loadStats();
-    document.getElementById('query-input').addEventListener('keydown', e => {
-      if (e.key === 'Enter') doSearch();
-    });
-  };
-
-  async function loadStats() {
-    const r = await fetch('/api/stats').then(r => r.json()).catch(() => null);
-    if (!r) return;
-    document.getElementById('stats-bar').innerHTML =
-      `Total images: <b>${r.total}</b> &nbsp;|&nbsp; Embedded: <b>${r.embedded}</b>`;
-  }
-
-  // ── Method toggle ─────────────────────────────────────────────────────────
-  function setMethod(m) {
-    currentMethod = m;
-    document.getElementById('btn-css').classList.toggle('active', m === 'css');
-    document.getElementById('btn-baseline').classList.toggle('active', m === 'baseline');
-    document.getElementById('filter-section').style.opacity = m === 'css' ? '1' : '0.4';
-  }
-
-  // ── Tab switching ─────────────────────────────────────────────────────────
-  function switchTab(tab) {
-    ['results','compare','eval'].forEach(t => {
-      document.getElementById(`${t}-panel`).classList.toggle('visible', t === tab);
-      document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
-    });
-  }
-
-  // ── Search ────────────────────────────────────────────────────────────────
-  async function doSearch() {
-    const q = document.getElementById('query-input').value.trim();
-    if (!q) return;
-    lastQuery = q;
-
-    const topK = document.getElementById('top-k').value;
-    const minBlur = document.getElementById('min-blur').value;
-    const minBright = document.getElementById('min-brightness').value;
-
-    let url = `/api/search?q=${encodeURIComponent(q)}&method=${currentMethod}&top_k=${topK}`;
-    if (currentMethod === 'css' && minBlur > 0)    url += `&min_blur=${minBlur}`;
-    if (currentMethod === 'css' && minBright > 0)  url += `&min_brightness=${minBright}`;
-
-    const panel = document.getElementById('results-panel');
-    panel.innerHTML = '<div class="spinner"></div>';
-    switchTab('results');
-
-    const data = await fetch(url).then(r => r.json()).catch(() => null);
-    if (!data || data.error) {
-      panel.innerHTML = `<div class="empty">${data?.error || 'Search failed.'}</div>`;
-      return;
+    function syncFilterLabels() {
+      const blur = document.getElementById("min-blur").value;
+      const brightness = document.getElementById("min-brightness").value;
+      document.getElementById("blur-val").textContent = Number(blur) > 0 ? blur : "OFF";
+      document.getElementById("bright-val").textContent = Number(brightness) > 0 ? brightness : "OFF";
     }
 
-    const isCss = data.method === 'css';
-    const label = isCss ? 'CSS Score' : 'Cosine Sim';
-
-    panel.innerHTML = `
-      <div class="results-header">
-        <b>${data.results.length}</b> results for <b>"${q}"</b>
-        &nbsp;·&nbsp; Method: <b>${isCss ? 'Composite Semantic Similarity (CSS)' : 'Baseline Cosine'}</b>
-      </div>
-      <div class="image-grid">
-        ${data.results.map((r, i) => imageCard(r, i+1, isCss ? 'css' : 'baseline', label)).join('')}
-      </div>`;
-  }
-
-  // ── Compare ───────────────────────────────────────────────────────────────
-  async function doCompare() {
-    const q = document.getElementById('query-input').value.trim();
-    if (!q) { alert('Enter a query first.'); return; }
-
-    const topK = 6;
-    const panel = document.getElementById('compare-panel');
-    panel.innerHTML = '<div class="spinner"></div>';
-    switchTab('compare');
-
-    const data = await fetch(`/api/compare?q=${encodeURIComponent(q)}&top_k=${topK}`)
-      .then(r => r.json()).catch(() => null);
-
-    if (!data) { panel.innerHTML = '<div class="empty">Compare failed.</div>'; return; }
-
-    panel.innerHTML = `
-      <div class="results-header" style="margin-bottom:1rem;">
-        Comparing <b>"${q}"</b> — top ${topK} results per method
-      </div>
-      <div class="compare-columns">
-        <div>
-          <div class="col-header baseline-col">⬛ Baseline — Pure Cosine Similarity</div>
-          <div class="compare-grid">
-            ${data.baseline.map((r,i) => imageCard(r, i+1, 'baseline', 'Cosine')).join('')}
-          </div>
-        </div>
-        <div>
-          <div class="col-header css-col">🟣 CSS — Composite Semantic Similarity</div>
-          <div class="compare-grid">
-            ${data.css.map((r,i) => imageCard(r, i+1, 'css', 'CSS')).join('')}
-          </div>
-        </div>
-      </div>`;
-  }
-
-  // ── Evaluation ────────────────────────────────────────────────────────────
-  async function runEval() {
-    const el = document.getElementById('eval-content');
-    el.innerHTML = '<div class="spinner"></div><p style="text-align:center;color:var(--muted);margin-top:.5rem;font-size:.85rem;">Running evaluation (~30s)...</p>';
-
-    const data = await fetch('/api/evaluate').then(r => r.json()).catch(() => null);
-    if (!data) { el.innerHTML = '<div class="empty">Evaluation failed.</div>'; return; }
-
-    // Build table
-    const rows = data.records;
-    const queries = [...new Set(rows.map(r => r.query))];
-    const ks = [...new Set(rows.map(r => r.k))].sort((a,b)=>a-b);
-
-    let html = '<div id="eval-table-wrap"><table><thead><tr>'
-      + '<th>Query</th><th>Label</th>'
-      + ks.flatMap(k => [`<th>P@${k} Base</th>`, `<th>P@${k} CSS</th>`, `<th>Δ@${k}</th>`]).join('')
-      + '</tr></thead><tbody>';
-
-    for (const q of queries) {
-      const qrows = rows.filter(r => r.query === q);
-      html += `<tr><td>${q}</td><td>${qrows[0].label}</td>`;
-      for (const k of ks) {
-        const r = qrows.find(r => r.k === k);
-        const cls = r.delta >= 0 ? 'delta-pos' : 'delta-neg';
-        const ds  = r.delta >= 0 ? `+${r.delta.toFixed(3)}` : r.delta.toFixed(3);
-        html += `<td>${r.baseline.toFixed(3)}</td><td>${r.css.toFixed(3)}</td><td class="${cls}">${ds}</td>`;
+    async function fetchJson(url, options) {
+      const response = await fetch(url, options);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Request failed");
       }
-      html += '</tr>';
+      return data;
     }
 
-    // Averages row
-    html += '<tr class="avg-row"><td>AVERAGE</td><td>—</td>';
-    for (const k of ks) {
-      const sub = rows.filter(r => r.k === k);
-      const avgB = sub.reduce((s,r)=>s+r.baseline,0)/sub.length;
-      const avgC = sub.reduce((s,r)=>s+r.css,0)/sub.length;
-      const avgD = avgC - avgB;
-      const cls  = avgD >= 0 ? 'delta-pos' : 'delta-neg';
-      const ds   = avgD >= 0 ? `+${avgD.toFixed(3)}` : avgD.toFixed(3);
-      html += `<td>${avgB.toFixed(3)}</td><td>${avgC.toFixed(3)}</td><td class="${cls}">${ds}</td>`;
+    async function loadStats() {
+      try {
+        const stats = await fetchJson("/api/stats");
+        document.getElementById("stats-bar").innerHTML =
+          `Images: <strong>${stats.total}</strong> | Embedded: <strong>${stats.embedded}</strong> | People: <strong>${stats.people_clusters || 0}</strong>`;
+      } catch {
+        document.getElementById("stats-bar").textContent = "Stats unavailable";
+      }
     }
-    html += '</tr></tbody></table></div>';
 
-    el.innerHTML = html;
-  }
+    function setMethod(method) {
+      currentMethod = method;
+      document.getElementById("btn-css").classList.toggle("active", method === "css");
+      document.getElementById("btn-baseline").classList.toggle("active", method === "baseline");
+      document.getElementById("filter-section").style.opacity = method === "css" ? "1" : "0.55";
+    }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  function imageCard(r, rank, method, label) {
-    const score = method === 'css' ? r.css_score : r.cosine_similarity;
-    const imgUrl = `/image?path=${encodeURIComponent(r.file_path)}`;
-    const dataAttr = encodeURIComponent(JSON.stringify(r));
-    return `
-      <div class="image-card" onclick="openModal('${dataAttr}')">
-        <img src="${imgUrl}" alt="${r.file_name}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22150%22><rect fill=%22%2321253a%22 width=%22200%22 height=%22150%22/><text x=%2250%%22 y=%2250%%22 fill=%22%2364748b%22 text-anchor=%22middle%22 dy=%22.3em%22>No Image</text></svg>'" />
-        <div class="card-body">
-          <div class="fname">${r.file_name}</div>
-          <div class="score-row">
-            <span class="score-badge ${method}">${label}: ${score.toFixed(3)}</span>
-            <span class="rank">#${rank}</span>
+    function switchTab(tab) {
+      activeTab = tab;
+      ["results", "compare", "eval", "people"].forEach((name) => {
+        document.getElementById(`${name}-panel`).classList.toggle("visible", name === tab);
+        document.getElementById(`tab-${name}`).classList.toggle("active", name === tab);
+      });
+      if (tab === "people") {
+        loadPeople(false);
+      }
+    }
+
+    async function doSearch() {
+      const query = document.getElementById("query-input").value.trim();
+      if (!query) return;
+
+      const topK = document.getElementById("top-k").value;
+      const minBlur = document.getElementById("min-blur").value;
+      const minBrightness = document.getElementById("min-brightness").value;
+      let url = `/api/search?q=${encodeURIComponent(query)}&method=${currentMethod}&top_k=${topK}`;
+
+      if (currentMethod === "css" && Number(minBlur) > 0) url += `&min_blur=${minBlur}`;
+      if (currentMethod === "css" && Number(minBrightness) > 0) url += `&min_brightness=${minBrightness}`;
+
+      const panel = document.getElementById("results-panel");
+      panel.innerHTML = '<div class="spinner"></div>';
+      switchTab("results");
+
+      try {
+        const data = await fetchJson(url);
+        const label = data.method === "css" ? "CSS" : "Cosine";
+        panel.innerHTML = `
+          <div class="status-line"><strong>${data.results.length}</strong> results for <strong>"${escapeHtml(query)}"</strong></div>
+          <div class="image-grid">
+            ${data.results.map((result, index) => imageCard(result, index + 1, data.method, label)).join("")}
+          </div>`;
+      } catch (error) {
+        panel.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    async function doCompare() {
+      const query = document.getElementById("query-input").value.trim();
+      if (!query) return;
+
+      const panel = document.getElementById("compare-panel");
+      panel.innerHTML = '<div class="spinner"></div>';
+      switchTab("compare");
+
+      try {
+        const data = await fetchJson(`/api/compare?q=${encodeURIComponent(query)}&top_k=6`);
+        panel.innerHTML = `
+          <div class="compare-columns">
+            <div class="panel compare-col">
+              <div class="compare-title">Baseline cosine</div>
+              <div class="image-grid">
+                ${data.baseline.map((result, index) => imageCard(result, index + 1, "baseline", "Cosine")).join("")}
+              </div>
+            </div>
+            <div class="panel compare-col">
+              <div class="compare-title">Composite semantic similarity</div>
+              <div class="image-grid">
+                ${data.css.map((result, index) => imageCard(result, index + 1, "css", "CSS")).join("")}
+              </div>
+            </div>
+          </div>`;
+      } catch (error) {
+        panel.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    async function runEval() {
+      const target = document.getElementById("eval-content");
+      target.innerHTML = '<div class="spinner"></div>';
+
+      try {
+        const data = await fetchJson("/api/evaluate");
+        const rows = data.records || [];
+        if (!rows.length) {
+          target.innerHTML = '<div class="empty">No evaluation data returned.</div>';
+          return;
+        }
+
+        const queries = [...new Set(rows.map((row) => row.query))];
+        const ks = [...new Set(rows.map((row) => row.k))].sort((a, b) => a - b);
+
+        let html = "<table><thead><tr><th>Query</th><th>Label</th>";
+        ks.forEach((k) => {
+          html += `<th>P@${k} Base</th><th>P@${k} CSS</th><th>Delta</th>`;
+        });
+        html += "</tr></thead><tbody>";
+
+        queries.forEach((query) => {
+          const queryRows = rows.filter((row) => row.query === query);
+          html += `<tr><td>${escapeHtml(query)}</td><td>${escapeHtml(queryRows[0].label)}</td>`;
+          ks.forEach((k) => {
+            const row = queryRows.find((entry) => entry.k === k);
+            const delta = row.delta >= 0 ? `+${row.delta.toFixed(3)}` : row.delta.toFixed(3);
+            const cls = row.delta >= 0 ? "delta-pos" : "delta-neg";
+            html += `<td>${row.baseline.toFixed(3)}</td><td>${row.css.toFixed(3)}</td><td class="${cls}">${delta}</td>`;
+          });
+          html += "</tr>";
+        });
+
+        html += "</tbody></table>";
+        target.innerHTML = html;
+      } catch (error) {
+        target.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    async function loadPeople(showSpinner = true) {
+      const list = document.getElementById("people-list");
+      const status = document.getElementById("people-status");
+
+      if (showSpinner) {
+        list.innerHTML = '<div class="spinner"></div>';
+      }
+
+      try {
+        const data = await fetchJson("/api/people");
+        const clusters = data.clusters || [];
+        status.textContent = `${clusters.length} cluster${clusters.length === 1 ? "" : "s"} found`;
+
+        if (!clusters.length) {
+          list.innerHTML = '<div class="empty">No face clusters yet. Run a scan and then recluster after faces are detected.</div>';
+          return;
+        }
+
+        list.innerHTML = `
+          <div class="cluster-grid">
+            ${clusters.map((cluster) => clusterCard(cluster)).join("")}
+          </div>`;
+
+        if (selectedClusterId) {
+          const stillExists = clusters.some((cluster) => cluster.cluster_id === selectedClusterId);
+          if (stillExists) loadCluster(selectedClusterId, false);
+        }
+      } catch (error) {
+        status.textContent = "Unable to load clusters";
+        list.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    async function loadCluster(clusterId, focusTab = true) {
+      selectedClusterId = clusterId;
+      if (focusTab) switchTab("people");
+
+      const target = document.getElementById("people-detail-body");
+      target.innerHTML = '<div class="spinner"></div>';
+      clearPeopleFeedback();
+
+      try {
+        const data = await fetchJson(`/api/people/${encodeURIComponent(clusterId)}`);
+        const label = data.person_label || "";
+        target.innerHTML = `
+          <div class="people-detail-header">
+            <div>
+              <div class="card-title">${escapeHtml(label || clusterId)}</div>
+              <div class="card-subtitle">${data.face_count} face${data.face_count === 1 ? "" : "s"} across ${data.items.length} image${data.items.length === 1 ? "" : "s"}</div>
+            </div>
           </div>
-        </div>
-      </div>`;
-  }
+          <div class="cluster-label-row">
+            <input id="cluster-label-input" type="text" value="${escapeHtmlAttr(label)}" placeholder="Assign a person name" />
+            <button class="btn" onclick="saveClusterLabel('${encodeJs(clusterId)}')">Save label</button>
+          </div>
+          <div class="face-grid">
+            ${data.items.map((item) => item.faces.map((face) => faceCard(item, face)).join("")).join("")}
+          </div>`;
+      } catch (error) {
+        target.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+      }
+    }
 
-  function openModal(dataAttr) {
-    const r = JSON.parse(decodeURIComponent(dataAttr));
-    document.getElementById('modal-img').src = `/image?path=${encodeURIComponent(r.file_path)}`;
-    const m = r.metadata || {};
-    document.getElementById('modal-meta').innerHTML = `
-      <b>File:</b> ${r.file_name}<br>
-      <b>CSS Score:</b> ${r.css_score ?? '—'} &nbsp; <b>Cosine:</b> ${r.cosine_similarity ?? '—'}<br>
-      <b>Resolution:</b> ${m.width ?? '?'} × ${m.height ?? '?'}<br>
-      <b>Blur Score:</b> ${m.blur_score?.toFixed(1) ?? '?'} &nbsp; <b>Brightness:</b> ${m.brightness?.toFixed(3) ?? '?'}<br>
-      <b>Method:</b> ${r.method ?? '—'}`;
-    document.getElementById('modal-overlay').classList.add('open');
-  }
+    async function saveClusterLabel(clusterId) {
+      const input = document.getElementById("cluster-label-input");
+      const label = input ? input.value.trim() : "";
+      if (!label) {
+        showPeopleFeedback("Enter a label before saving.", true);
+        return;
+      }
 
-  function closeModal() {
-    document.getElementById('modal-overlay').classList.remove('open');
-  }
-</script>
+      try {
+        await fetchJson(`/api/people/${encodeURIComponent(clusterId)}/label`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label })
+        });
+        showPeopleFeedback(`Saved label "${label}".`, false);
+        await loadPeople(false);
+        await loadCluster(clusterId, false);
+        loadStats();
+      } catch (error) {
+        showPeopleFeedback(error.message, true);
+      }
+    }
 
-<!-- Evaluation API route (added inline to avoid extra file) -->
-<script>
-  // Evaluation endpoint called from the page
-  // The actual /api/evaluate route needs to be added to app.py
-</script>
+    async function reclusterPeople() {
+      const status = document.getElementById("people-status");
+      status.textContent = "Reclustering faces...";
+      clearPeopleFeedback();
 
+      try {
+        const summary = await fetchJson("/api/people/recluster", { method: "POST" });
+        showPeopleFeedback(
+          `Reclustering complete: ${summary.num_clusters} cluster(s), ${summary.noise_faces} noise face(s).`,
+          false
+        );
+        await loadPeople(false);
+        await loadStats();
+      } catch (error) {
+        showPeopleFeedback(error.message, true);
+      }
+    }
+
+    function imageCard(result, rank, method, label) {
+      const score = method === "css" ? result.css_score : result.cosine_similarity;
+      const encoded = encodeURIComponent(JSON.stringify(result));
+      return `
+        <article class="card image-card" onclick="openModal('${encoded}')">
+          <img src="/image?path=${encodeURIComponent(result.file_path)}" alt="${escapeHtmlAttr(result.file_name)}" loading="lazy" />
+          <div class="card-body">
+            <div class="card-title">${escapeHtml(result.file_name)}</div>
+            <div class="score-row">
+              <span class="pill ${method === "css" ? "css" : "baseline"}">${label}: ${Number(score || 0).toFixed(3)}</span>
+              <span class="mini-meta">#${rank}</span>
+            </div>
+          </div>
+        </article>`;
+    }
+
+    function clusterCard(cluster) {
+      const rep = cluster.representative;
+      const bbox = rep.bbox.join(",");
+      const name = cluster.person_label || cluster.cluster_id;
+      const activeClass = selectedClusterId === cluster.cluster_id ? " style='border-color: rgba(255, 176, 103, 0.7);'" : "";
+      return `
+        <article class="card cluster-card" onclick="loadCluster('${encodeJs(cluster.cluster_id)}')"${activeClass}>
+          <img src="/face?path=${encodeURIComponent(rep.file_path)}&bbox=${encodeURIComponent(bbox)}" alt="${escapeHtmlAttr(name)}" loading="lazy" />
+          <div class="card-body">
+            <div class="card-title">${escapeHtml(name)}</div>
+            <div class="score-row">
+              <span class="pill people">${cluster.face_count} face${cluster.face_count === 1 ? "" : "s"}</span>
+              <span class="mini-meta">${escapeHtml(cluster.cluster_id)}</span>
+            </div>
+          </div>
+        </article>`;
+    }
+
+    function faceCard(item, face) {
+      const bbox = face.bbox.join(",");
+      const imageData = encodeURIComponent(JSON.stringify({
+        file_path: item.file_path,
+        file_name: item.file_name,
+        metadata: item.metadata,
+        face_bbox: face.bbox,
+        person_label: face.person_label,
+        cluster_id: face.cluster_id
+      }));
+      return `
+        <article class="card face-card" onclick="openModal('${imageData}')">
+          <img src="/face?path=${encodeURIComponent(item.file_path)}&bbox=${encodeURIComponent(bbox)}" alt="${escapeHtmlAttr(item.file_name)}" loading="lazy" />
+          <div class="card-body">
+            <div class="card-title">${escapeHtml(item.file_name)}</div>
+            <div class="card-subtitle">
+              Cluster: ${escapeHtml(face.cluster_id || "unclustered")}<br>
+              Box: [${face.bbox.join(", ")}]
+            </div>
+          </div>
+        </article>`;
+    }
+
+    function openModal(encoded) {
+      const data = JSON.parse(decodeURIComponent(encoded));
+      document.getElementById("modal-img").src = `/image?path=${encodeURIComponent(data.file_path)}`;
+      const meta = data.metadata || {};
+      const faceLine = data.face_bbox ? `<br><strong>Face box:</strong> [${data.face_bbox.join(", ")}]` : "";
+      document.getElementById("modal-meta").innerHTML = `
+        <strong>File:</strong> ${escapeHtml(data.file_name || "")}<br>
+        <strong>Resolution:</strong> ${meta.width ?? "?"} x ${meta.height ?? "?"}<br>
+        <strong>Blur score:</strong> ${formatNumber(meta.blur_score)}<br>
+        <strong>Brightness:</strong> ${formatNumber(meta.brightness)}${faceLine}`;
+      document.getElementById("modal-overlay").classList.add("open");
+    }
+
+    function closeModal() {
+      document.getElementById("modal-overlay").classList.remove("open");
+    }
+
+    function showPeopleFeedback(message, isError) {
+      document.getElementById("people-feedback").innerHTML =
+        `<div class="message ${isError ? "error" : "ok"}">${escapeHtml(message)}</div>`;
+    }
+
+    function clearPeopleFeedback() {
+      document.getElementById("people-feedback").innerHTML = "";
+    }
+
+    function formatNumber(value) {
+      return typeof value === "number" ? value.toFixed(3) : "?";
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function escapeHtmlAttr(value) {
+      return escapeHtml(value);
+    }
+
+    function encodeJs(value) {
+      return String(value ?? "").replaceAll("\\", "\\\\").replaceAll("'", "\\'");
+    }
+  </script>
 </body>
 </html>
